@@ -14,3 +14,10 @@ npm-debug.log*
 # Docker & Temp
 .DS_Store
 Thumbs.db
+# Local secrets and backups
+.env
+.env.*
+!.env.example
+docker-compose.backup.yml
+*.tar
+*.tar.gz
