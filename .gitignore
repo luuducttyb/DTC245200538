@@ -1,0 +1,16 @@
+# Dependency directories
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+*.env.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Docker & Temp
+.DS_Store
+Thumbs.db

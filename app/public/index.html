@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hệ Thống Quản Lý Nhà Hàng & Order | Đề 12</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-logo">🍽️</div>
+        <div class="brand-text">
+          <h1>Nhà Hàng Vị Việt</h1>
+          <span class="subtitle">Đề 12: Hệ Thống Quản Lý Nhà Hàng & Order</span>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <div class="status-chip" id="dbStatus">
+          <span class="dot online"></span>
+          <span>PostgreSQL: Kết nối</span>
+        </div>
+        <div class="status-chip" id="systemClock">
+          <span class="clock-icon">🕒</span>
+          <span id="currentTime">--:--:--</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Top Navigation Tabs -->
+  <nav class="nav-tabs">
+    <div class="tabs-container">
+      <button class="tab-btn active" data-tab="tables">
+        <span class="tab-icon">🪑</span> Sơ Đồ Bàn Ăn
+      </button>
+      <button class="tab-btn" data-tab="orders">
+        <span class="tab-icon">📋</span> Quản Lý Đơn Hàng
+      </button>
+      <button class="tab-btn" data-tab="dishes">
+        <span class="tab-icon">🍜</span> Thực Đơn Món Ăn
+      </button>
+      <button class="tab-btn" data-tab="monitoring">
+        <span class="tab-icon">📊</span> Giám Sát & Hạ Tầng
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    
+    <!-- KPI Summary Bar -->
+    <section class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon blue">💰</div>
+        <div class="kpi-data">
+          <span class="kpi-label">Tổng Doanh Thu</span>
+          <span class="kpi-value" id="kpiRevenue">0 đ</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon green">📝</div>
+        <div class="kpi-data">
+          <span class="kpi-label">Tổng Đơn Hàng</span>
+          <span class="kpi-value" id="kpiOrders">0</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon orange">🔥</div>
+        <div class="kpi-data">
+          <span class="kpi-label">Đang Phục Vụ</span>
+          <span class="kpi-value" id="kpiActiveOrders">0</span>
+        </div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon purple">🪑</div>
+        <div class="kpi-data">
+          <span class="kpi-label">Bàn Có Khách</span>
+          <span class="kpi-value" id="kpiTables">0 / 0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 1: SƠ ĐỒ BÀN ĂN -->
+    <section id="tab-tables" class="tab-pane active">
+      <div class="section-toolbar">
+        <div class="toolbar-title">
+          <h2>Sơ Đồ Bàn Ăn Trực Quan</h2>
+          <p class="section-desc">Theo dõi tình trạng bàn trống, bàn có khách và thao tác đặt món nhanh</p>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-secondary" onclick="loadTables()">🔄 Làm Mới</button>
+          <button class="btn btn-primary" onclick="openCreateOrderModal()">➕ Tạo Đơn Hàng Mới</button>
+        </div>
+      </div>
+
+      <div class="tables-grid" id="tablesContainer">
+        <!-- Bàn ăn sẽ được render tự động -->
+        <div class="loading-state">Đang tải danh sách bàn ăn...</div>
+      </div>
+    </section>
+
+    <!-- TAB 2: QUẢN LÝ ĐƠN HÀNG -->
+    <section id="tab-orders" class="tab-pane">
+      <div class="section-toolbar">
+        <div class="toolbar-title">
+          <h2>Danh Sách Đơn Hàng</h2>
+          <p class="section-desc">Xem chi tiết món, tính tiền tự động và cập nhật trạng thái đơn</p>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-secondary" onclick="loadOrders()">🔄 Làm Mới</button>
+          <button class="btn btn-primary" onclick="openCreateOrderModal()">➕ Thêm Đơn Hàng</button>
+        </div>
+      </div>
+
+      <!-- Bộ lọc trạng thái đơn -->
+      <div class="filter-bar">
+        <button class="filter-chip active" onclick="filterOrders('ALL', this)">Tất Cả</button>
+        <button class="filter-chip" onclick="filterOrders('CHO_XU_LY', this)">Chờ Xử Lý</button>
+        <button class="filter-chip" onclick="filterOrders('DANG_CHUAN_BI', this)">Đang Chuẩn Bị</button>
+        <button class="filter-chip" onclick="filterOrders('DA_PHUC_VU', this)">Đã Phục Vụ</button>
+        <button class="filter-chip" onclick="filterOrders('DA_THANH_TOAN', this)">Đã Thanh Toán</button>
+      </div>
+
+      <div class="orders-list" id="ordersContainer">
+        <!-- Đơn hàng sẽ được render tự động -->
+      </div>
+    </section>
+
+    <!-- TAB 3: THỰC ĐƠN MÓN ĂN -->
+    <section id="tab-dishes" class="tab-pane">
+      <div class="section-toolbar">
+        <div class="toolbar-title">
+          <h2>Thực Đơn Món Ăn</h2>
+          <p class="section-desc">Quản lý danh sách món, giá thành và tình trạng còn/hết hàng</p>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-secondary" onclick="loadDishes()">🔄 Làm Mới</button>
+          <button class="btn btn-primary" onclick="openAddDishModal()">➕ Thêm Món Mới</button>
+        </div>
+      </div>
+
+      <!-- Bộ lọc danh mục -->
+      <div class="filter-bar">
+        <button class="filter-chip active" onclick="filterDishes('ALL', this)">Tất Cả</button>
+        <button class="filter-chip" onclick="filterDishes('Món chính', this)">Món Chính</button>
+        <button class="filter-chip" onclick="filterDishes('Khai vị', this)">Khai Vị</button>
+        <button class="filter-chip" onclick="filterDishes('Đồ uống', this)">Đồ Uống</button>
+        <button class="filter-chip" onclick="filterDishes('Tráng miệng', this)">Tráng Miệng</button>
+      </div>
+
+      <div class="dishes-grid" id="dishesContainer">
+        <!-- Danh sách món ăn được render tự động -->
+      </div>
+    </section>
+
+    <!-- TAB 4: GIÁM SÁT & HẠ TẦNG -->
+    <section id="tab-monitoring" class="tab-pane">
+      <div class="section-toolbar">
+        <div class="toolbar-title">
+          <h2>Bảng Điều Khiển Giám Sát & Hạ Tầng</h2>
+          <p class="section-desc">Liên kết trực tiếp tới các dịch vụ Monitoring, Logging và Database</p>
+        </div>
+      </div>
+
+      <div class="monitoring-grid">
+        <div class="service-card">
+          <div class="service-icon prometheus-icon">📈</div>
+          <h3>Prometheus Metrics</h3>
+          <p>Hệ thống thu thập số liệu thời gian thực: số lượng request, độ trễ và số đơn hàng.</p>
+          <div class="service-endpoint">Endpoint: <code>/metrics</code> (Cổng 9090)</div>
+          <a href="http://localhost:9090" target="_blank" class="btn btn-outline">Mở Prometheus UI ↗</a>
+        </div>
+
+        <div class="service-card">
+          <div class="service-icon grafana-icon">📊</div>
+          <h3>Grafana Dashboard</h3>
+          <p>Biểu đồ trực quan hóa số liệu nhà hàng và logs từ Promtail & Loki.</p>
+          <div class="service-endpoint">Cổng 3001 | User: <code>admin</code> / Pass: <code>admin</code></div>
+          <a href="http://localhost:3001" target="_blank" class="btn btn-primary">Mở Grafana Dashboard ↗</a>
+        </div>
+
+        <div class="service-card">
+          <div class="service-icon loki-icon">📑</div>
+          <h3>Loki & Promtail Logging</h3>
+          <p>Thu thập và truy vấn log tập trung thông qua ngôn ngữ LogQL mạnh mẽ.</p>
+          <div class="service-endpoint">Loki: <code>http://localhost:3100</code></div>
+          <a href="http://localhost:3001/explore" target="_blank" class="btn btn-outline">Khám phá LogQL trong Grafana ↗</a>
+        </div>
+
+        <div class="service-card">
+          <div class="service-icon pgadmin-icon">🐘</div>
+          <h3>pgAdmin 4 (PostgreSQL)</h3>
+          <p>Giao diện web trực quan quản trị cơ sở dữ liệu PostgreSQL cho Đề 12.</p>
+          <div class="service-endpoint">Cổng 5050 | User: <code>admin@nhahang.local</code></div>
+          <a href="http://localhost:5050" target="_blank" class="btn btn-outline">Mở pgAdmin ↗</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL: TẠO ĐƠN HÀNG MỚI (Tự động tính tiền) -->
+  <div class="modal" id="orderModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>➕ Tạo Đơn Hàng Mới</h3>
+        <button class="modal-close" onclick="closeModal('orderModal')">✖</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="orderTableSelect">Chọn Bàn Ăn:</label>
+          <select id="orderTableSelect" class="form-control">
+            <option value="">-- Chọn bàn --</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Chọn Món & Số Lượng (Tự động tính tổng tiền):</label>
+          <div class="dish-picker-list" id="dishPickerList">
+            <!-- Render danh sách món kèm nút tăng giảm số lượng -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="orderNotes">Ghi Chú Đơn Hàng:</label>
+          <textarea id="orderNotes" class="form-control" placeholder="Ví dụ: Ít cay, không hành, cho nhiều đá..."></textarea>
+        </div>
+
+        <div class="order-summary-box">
+          <div class="summary-row">
+            <span>Số loại món đã chọn:</span>
+            <span id="summaryItemCount" class="bold">0</span>
+          </div>
+          <div class="summary-row total-row">
+            <span>TỔNG TIỀN THANH TOÁN:</span>
+            <span id="summaryTotalAmount" class="highlight-price">0 đ</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('orderModal')">Hủy Bỏ</button>
+        <button class="btn btn-primary" id="btnSubmitOrder" onclick="submitCreateOrder()">Xác Nhận Tạo Đơn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: THÊM MÓN ĂN MỚI -->
+  <div class="modal" id="dishModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>➕ Thêm Món Ăn Mới</h3>
+        <button class="modal-close" onclick="closeModal('dishModal')">✖</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="dishName">Tên Món Ăn:</label>
+          <input type="text" id="dishName" class="form-control" placeholder="Ví dụ: Gà rang muối">
+        </div>
+        <div class="form-group">
+          <label for="dishCategory">Danh Mục:</label>
+          <select id="dishCategory" class="form-control">
+            <option value="Món chính">Món chính</option>
+            <option value="Khai vị">Khai vị</option>
+            <option value="Đồ uống">Đồ uống</option>
+            <option value="Tráng miệng">Tráng miệng</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="dishPrice">Đơn Giá (VNĐ):</label>
+          <input type="number" id="dishPrice" class="form-control" placeholder="Ví dụ: 75000" min="0" step="1000">
+        </div>
+        <div class="form-group">
+          <label for="dishDesc">Mô Tả Món:</label>
+          <textarea id="dishDesc" class="form-control" placeholder="Mô tả nguyên liệu hoặc cách chế biến..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('dishModal')">Hủy Bỏ</button>
+        <button class="btn btn-primary" onclick="submitCreateDish()">Lưu Món Ăn</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

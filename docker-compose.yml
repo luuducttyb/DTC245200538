@@ -1,0 +1,187 @@
+services:
+  # =========================================================
+  # 1. CƠ SỞ DỮ LIỆU POSTGRESQL (Hardening: Không publish port ra host)
+  # =========================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: de12-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant_db}
+      POSTGRES_USER: ${POSTGRES_USER:-resta_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-***REMOVED***}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - backend-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-resta_admin} -d ${POSTGRES_DB:-restaurant_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # =========================================================
+  # 2. PGADMIN 4 (Quản trị cơ sở dữ liệu trên giao diện Web)
+  # =========================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: de12-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@nhahang.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-***REMOVED***}
+      PGADMIN_LISTEN_PORT: 5050
+    ports:
+      - "${PGADMIN_PORT:-5050}:5050"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - backend-net
+      - frontend-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # =========================================================
+  # 3. ỨNG DỤNG NODE.JS (Non-root container, REST API & Web)
+  # =========================================================
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: de12-app
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant_db}
+      POSTGRES_USER: ${POSTGRES_USER:-resta_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-***REMOVED***}
+      APP_PORT: 3000
+      LOG_DIR: /var/log/app
+    volumes:
+      - app_logs:/var/log/app
+    networks:
+      - backend-net
+      - frontend-net
+      - monitoring-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # =========================================================
+  # 4. NGINX REVERSE PROXY (HTTP 80 + HTTPS 443 Self-Signed + Security Headers)
+  # =========================================================
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: de12-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-8080}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    networks:
+      - frontend-net
+    depends_on:
+      - app
+
+  # =========================================================
+  # 5. PROMETHEUS (Thu thập số liệu thời gian thực)
+  # =========================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: de12-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - monitoring-net
+    depends_on:
+      - app
+
+  # =========================================================
+  # 6. GRAFANA (Trực quan hóa số liệu & Logs)
+  # =========================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: de12-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ***REMOVED***
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    networks:
+      - monitoring-net
+      - frontend-net
+    depends_on:
+      - prometheus
+      - loki
+
+  # =========================================================
+  # 7. GRAFANA LOKI (Lưu trữ và chỉ mục hóa Log)
+  # =========================================================
+  loki:
+    image: grafana/loki:latest
+    container_name: de12-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./logging/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    networks:
+      - monitoring-net
+
+  # =========================================================
+  # 8. PROMTAIL (Thu thập file log từ ứng dụng đẩy sang Loki)
+  # =========================================================
+  promtail:
+    image: grafana/promtail:latest
+    container_name: de12-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./logging/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - app_logs:/var/log/app:ro
+    networks:
+      - monitoring-net
+    depends_on:
+      - loki
+      - app
+
+# =========================================================
+# PHÂN TÁCH MẠNG (NETWORK ISOLATION)
+# =========================================================
+networks:
+  backend-net:
+    driver: bridge
+    internal: true # Mạng nội bộ tuyệt đối, ngăn cách database khỏi bên ngoài
+  frontend-net:
+    driver: bridge
+  monitoring-net:
+    driver: bridge
+
+# =========================================================
+# LƯU TRỮ BỀN VỮNG (NAMED VOLUMES)
+# =========================================================
+volumes:
+  pg_data:
+  pgadmin_data:
+  app_logs:
+  prometheus_data:
+  grafana_data:
+  loki_data:
